@@ -25,6 +25,13 @@ def taps_from_dict(d):
     return np.array([d[k] for k in TAP_KEYS], dtype=np.float64)
 
 
+def load_cal(path):
+    """Read a <clip>.cal.json: returns (taps_px, release_frame or None, capture_fps or None)."""
+    import json
+    d = json.load(open(path))
+    return taps_from_dict(d), d.get("release_frame"), d.get("capture_fps")
+
+
 def similarity_from_taps(taps_px):
     """Least-squares similarity (scale, rotation, shift) image -> metres.
 

@@ -1,23 +1,27 @@
 import argparse
-import json
 
 import cv2
-import numpy as np
 
-from .calibration import taps_from_dict
+from .calibration import load_cal
 from .pipeline import analyze_video
 
 
 def main():
     ap = argparse.ArgumentParser(prog="cricketspeed")
     ap.add_argument("video")
-    ap.add_argument("--taps", required=True, help="json with bowler_base/bowler_top/batter_base/batter_top [x,y]")
-    ap.add_argument("--capture-fps", type=float, default=None)
-    ap.add_argument("--release-frame", type=int, default=None)
+    ap.add_argument("--cal", "--taps", dest="cal", required=True,
+                    help="<clip>.cal.json from tools/pick_taps.py (4 taps, release frame, capture fps)")
+    ap.add_argument("--capture-fps", type=float, default=None, help="overrides the value in the cal file")
+    ap.add_argument("--release-frame", type=int, default=None, help="overrides the value in the cal file")
     ap.add_argument("--overlay", default=None, help="write an overlay jpg here")
     a = ap.parse_args()
-    taps = taps_from_dict(json.load(open(a.taps)))
-    r = analyze_video(a.video, taps, capture_fps=a.capture_fps, release_frame=a.release_frame)
+    taps, rel, cfps = load_cal(a.cal)
+    rel = a.release_frame if a.release_frame is not None else rel
+    cfps = a.capture_fps or cfps
+    try:
+        r = analyze_video(a.video, taps, capture_fps=cfps, release_frame=rel)
+    except ValueError as e:
+        raise SystemExit(f"error: {e}")
     print(r.headline())
     if r.ok:
         print(f"average speed over tracked flight: {r.average_kmh:.1f} km/h")

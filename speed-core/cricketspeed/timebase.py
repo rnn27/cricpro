@@ -73,8 +73,9 @@ def make_timebase(n_frames, video_path=None, sidecar=None, capture_fps=None):
     if t is not None and len(t) >= n_frames:
         tb = _summarise(t[:n_frames], "container", False, warnings)
         if tb.fps < 100:
-            tb.warnings.append(
-                f"container fps is {tb.fps:.0f}: slow-motion clips are often re-timed "
-                "to playback rate. Pass the real capture fps or record in-app.")
+            raise ValueError(
+                f"the file says {tb.fps:.0f} fps, which is probably the playback rate of a "
+                "slow-motion clip. Give the real capture fps (e.g. 240) via capture_fps, "
+                "otherwise every speed would come out many times too low.")
         return tb
     raise ValueError("No usable timestamps: provide a sidecar or --capture-fps")

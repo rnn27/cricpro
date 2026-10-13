@@ -5,11 +5,13 @@ algorithm that the Android app will run; validated on synthetic deliveries.
 
 ## Run
     pip install numpy opencv-python scipy
-    python -m cricketspeed clip.mp4 --taps taps.json --release-frame 72
-    python tests/validate_synthetic.py        # accuracy check vs known speeds
+    python tools/pick_taps.py clip.mp4 --capture-fps 240      # click 4 stump points, mark release frame
+    python -m cricketspeed clip.mp4 --cal clip.cal.json
+    python tools/batch_eval.py clips.csv                      # many clips vs a reference speed
+    python tests/validate_synthetic.py                        # accuracy check vs known speeds
 
-`taps.json`: {"bowler_base":[x,y], "bowler_top":[x,y], "batter_base":[x,y], "batter_top":[x,y]}
-(pixel taps on the base and top of the stumps at each end).
+`clip.cal.json` holds the four taps (bowler_base, bowler_top, batter_base, batter_top as [x,y] pixels),
+`release_frame` and `capture_fps`. See ../docs/testing-v0.1.md.
 
 ## Recording contract for the in-app recorder (Android)
 Next to `clip.mp4` write `clip.mp4.timestamps.json`:
