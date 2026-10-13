@@ -13,3 +13,7 @@ See [JOURNEY.md](JOURNEY.md) for the index and the logging convention.
     docs/journey/     decision log, one numbered entry per working session
     speed-core/       Python reference implementation of the speed pipeline (v0.1)
     android/          (planned) in-app recorder + UI
+
+## Quick start
+    cd speed-core && pip install -r requirements.txt
+    python tests/validate_synthetic.py
