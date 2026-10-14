@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.2
+- testbench/: phone-friendly web page (served from the PC) to upload clips, tap stumps, mark release, get speed, log results
+- docs/how-it-works.md, docs/git-in-plain-words.md
+
 ## v0.1.1
 - tools/pick_taps.py (tap + release-frame picker), tools/batch_eval.py (reference comparison)
 - CLI reads <clip>.cal.json; refuses re-timed low-fps containers without a capture fps

@@ -12,6 +12,8 @@ See [JOURNEY.md](JOURNEY.md) for the index and the logging convention.
 ## Layout
     docs/journey/     decision log, one numbered entry per working session
     speed-core/       Python reference implementation of the speed pipeline + tools/
+    testbench/        phone + PC web page for testing on real clips
+    docs/how-it-works.md   plain-English explanation (kept up to date)
     docs/testing-v0.1.md   how to test on real clips
     android/          (planned) in-app recorder + UI
 

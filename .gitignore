@@ -6,3 +6,5 @@ __pycache__/
 .idea/
 build/
 local.properties
+testbench/data/
+*.cal.json

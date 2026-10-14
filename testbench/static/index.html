@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cricpro test bench</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --fg:#e8eaf0; --mut:#9aa3b2; --acc:#3ddc97; --warn:#ffb454; --bad:#ff6b6b; --line:#2a2f3a; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f4f5f8; --card:#fff; --fg:#14171f; --mut:#586174; --line:#dde1ea; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  header b { font-size:18px; } header a { color:var(--acc); font-size:14px; cursor:pointer; text-decoration:none; }
+  main { max-width:720px; margin:0 auto; padding:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  h2 { margin:0 0 8px; font-size:17px; } p, li { color:var(--mut); font-size:14px; margin:6px 0; }
+  label { display:block; font-size:13px; color:var(--mut); margin:10px 0 4px; }
+  input, textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font-size:16px; }
+  button { padding:11px 14px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--fg); font-size:15px; margin:4px 4px 0 0; }
+  button.primary { background:var(--acc); color:#06210f; border-color:var(--acc); font-weight:600; }
+  button:disabled { opacity:.4; }
+  canvas, img.fit { width:100%; height:auto; border-radius:8px; display:block; touch-action:pan-y; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .grow { flex:1; } .hide { display:none; }
+  .big { font-size:34px; font-weight:700; } .badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:13px; font-weight:600; }
+  .HIGH { background:var(--acc); color:#06210f; } .MEDIUM { background:var(--warn); color:#2b1b00; } .LOW { background:var(--bad); color:#2b0000; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td, th { padding:6px 4px; border-bottom:1px solid var(--line); text-align:left; color:var(--mut); }
+  progress { width:100%; }
+  .tap { padding:4px 8px; border-radius:6px; font-size:13px; border:1px solid var(--line); margin:2px; display:inline-block; color:var(--mut); }
+  .tap.cur { border-color:var(--acc); color:var(--fg); } .tap.done { color:var(--acc); }
+</style>
+</head>
+<body>
+<header><b>cricpro test bench</b><span><a id="navNew">New clip</a> &nbsp; <a id="navHist">History</a></span></header>
+<main>
+
+<section id="s1" class="card">
+  <h2>1. Upload a clip</h2>
+  <p>Record one delivery with your phone's normal camera in 240 fps slow-motion, then pick the file here.
+     Trim it to the delivery (a few seconds). iPhone tip: if the picker re-compresses the video, send the original
+     to the PC (AirDrop/Files/cable) and use this page on the PC instead.</p>
+  <label>Video file</label><input type="file" id="file" accept="video/*">
+  <label>Capture frame rate (fps) the phone recorded at</label><input type="number" id="cfps" value="240" min="30" max="1000">
+  <div class="row"><button class="primary" id="btnUp">Upload</button></div>
+  <progress id="upBar" class="hide" max="1" value="0"></progress>
+  <p id="upMsg"></p>
+</section>
+
+<section id="s2" class="card hide">
+  <h2>2. Mark the stumps</h2>
+  <p id="clipInfo"></p>
+  <p>Scrub to a frame where both sets of stumps are clearly visible. Tap the point on the main picture, then fine-tune in the
+     zoomed square (tap inside it to move the cross). Order below.</p>
+  <canvas id="cal"></canvas>
+  <div class="row"><span>frame</span><input class="grow" type="range" id="calSlider" min="0" max="0" value="0" style="padding:0"><span id="calNum"></span></div>
+  <div id="tapList"></div>
+  <p id="tapHint"></p>
+  <canvas id="zoom" width="256" height="256" style="max-width:256px"></canvas>
+  <div class="row">
+    <button id="nxL">◀</button><button id="nxR">▶</button><button id="nxU">▲</button><button id="nxD">▼</button>
+    <button class="primary" id="tapOk">Confirm point</button><button id="tapBack">Back</button>
+  </div>
+  <div class="row"><button class="primary" id="toRel" disabled>Continue to release frame</button></div>
+</section>
+
+<section id="s3" class="card hide">
+  <h2>3. Mark the release frame</h2>
+  <p>Find the last frame where the ball is still in the bowler's hand (or the first where it has just left). Being 1–2 frames off barely changes the speed.</p>
+  <img id="relImg" class="fit" alt="frame">
+  <div class="row"><input class="grow" type="range" id="relSlider" min="0" max="0" value="0" style="padding:0"><span id="relNum"></span></div>
+  <div class="row"><button id="rm10">−10</button><button id="rm1">−1</button><button id="rp1">+1</button><button id="rp10">+10</button>
+    <button class="primary" id="relMark">Mark this frame as release</button></div>
+  <p id="relInfo"></p>
+  <div class="row"><button class="primary" id="toRun" disabled>Continue</button><button id="skipRel">Skip (less accurate)</button></div>
+</section>
+
+<section id="s4" class="card hide">
+  <h2>4. Details and run</h2>
+  <label>Reference speed km/h (radar / machine) — optional</label><input type="number" id="ref" step="0.1">
+  <label>Camera distance from the pitch centre line (metres, approx.)</label><input type="number" id="dist" step="0.5">
+  <label>How far the ball was from the centre line (metres, approx.)</label><input type="number" id="lat" step="0.1">
+  <label>Notes (camera, light, ball colour...)</label><textarea id="notes" rows="2"></textarea>
+  <div class="row"><button class="primary" id="btnRun">Calculate speed</button></div>
+  <p id="runMsg"></p>
+</section>
+
+<section id="s5" class="card hide">
+  <h2>Result</h2>
+  <div class="big" id="resBig"></div><div id="resBadge"></div>
+  <p id="resDiff"></p>
+  <ul id="resNotes"></ul>
+  <p id="resDetail"></p>
+  <img id="resImg" class="fit" alt="track overlay">
+  <p>Green circles = detected ball positions used. Red line = fitted path. Yellow crosses = your stump taps.</p>
+  <div class="row"><button class="primary" id="again">New clip</button><button id="reRun">Change taps / release and re-run</button></div>
+</section>
+
+<section id="sH" class="card hide">
+  <h2>History</h2>
+  <p><a href="/api/results.csv" style="color:var(--acc)">Download results.csv</a></p>
+  <table id="histTable"></table>
+</section>
+
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const SECTIONS = ['s1','s2','s3','s4','s5','sH'];
+function show(id){ SECTIONS.forEach(s => $(s).classList.toggle('hide', s !== id)); window.scrollTo(0,0); }
+const NAMES = ['bowler_base','bowler_top','batter_base','batter_top'];
+const PROMPTS = ["1/4  BASE of the stumps at the BOWLER's end", "2/4  TOP of the stumps at the BOWLER's end",
+                 "3/4  BASE of the stumps at the BATTER's end", "4/4  TOP of the stumps at the BATTER's end"];
+const S = { sid:null, n:0, w:0, h:0, cfps:240, taps:[null,null,null,null], cur:0, calFrame:0, relFrame:null, img:null };
+
+function loadImg(url){ return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; }); }
+const frameUrl = n => `/api/session/${S.sid}/frame/${n}`;
+
+// ---- 1. upload ----
+$('btnUp').onclick = () => {
+  const f = $('file').files[0]; if (!f) { $('upMsg').textContent = 'Pick a video first.'; return; }
+  S.cfps = parseFloat($('cfps').value) || 240;
+  const fd = new FormData(); fd.append('video', f); fd.append('capture_fps', S.cfps);
+  const x = new XMLHttpRequest(); x.open('POST', '/api/upload');
+  $('upBar').classList.remove('hide');
+  x.upload.onprogress = e => { if (e.lengthComputable) $('upBar').value = e.loaded / e.total; };
+  x.onload = () => { try { S.sid = JSON.parse(x.responseText).id; $('upMsg').textContent = 'Uploaded. Preparing frames…'; pollSession(); } catch(e){ $('upMsg').textContent = 'Upload failed.'; } };
+  x.onerror = () => { $('upMsg').textContent = 'Upload failed (network).'; };
+  x.send(fd);
+};
+async function pollSession(){
+  const s = await (await fetch(`/api/session/${S.sid}`)).json();
+  if (s.state === 'extracting') { $('upBar').value = s.progress || 0; $('upMsg').textContent = `Preparing frames… ${Math.round((s.progress||0)*100)}%`; setTimeout(pollSession, 700); return; }
+  if (s.state === 'error') { $('upMsg').textContent = 'Error: ' + s.message; return; }
+  S.n = s.n_frames; S.w = s.width; S.h = s.height; S.cfps = s.capture_fps || S.cfps;
+  const secs = S.n / S.cfps;
+  let info = `${S.n} frames, ${S.w}×${S.h}. At ${S.cfps} fps that is ${secs.toFixed(2)} s of real time (container says ${s.container_fps.toFixed(1)} fps).`;
+  if (secs > 10) info += ' ⚠ That is long for one delivery: check the capture fps, or trim the clip.';
+  $('clipInfo').textContent = info;
+  S.taps = [null,null,null,null]; S.cur = 0; S.relFrame = null;
+  $('calSlider').max = S.n - 1; S.calFrame = Math.floor(S.n / 3); $('calSlider').value = S.calFrame;
+  show('s2'); await setCalFrame(S.calFrame);
+}
+
+// ---- 2. calibration ----
+async function setCalFrame(n){
+  S.calFrame = n; $('calNum').textContent = n; S.img = await loadImg(frameUrl(n)); drawCal();
+}
+$('calSlider').oninput = e => setCalFrame(parseInt(e.target.value));
+function drawCal(){
+  const c = $('cal'), g = c.getContext('2d');
+  c.width = S.img.naturalWidth; c.height = S.img.naturalHeight; g.drawImage(S.img, 0, 0);
+  g.lineWidth = Math.max(2, c.width / 640); g.font = `${Math.round(c.width/45)}px sans-serif`;
+  S.taps.forEach((t, i) => { if (!t) return; g.strokeStyle = i === S.cur ? '#3ddc97' : '#ffd34d'; g.fillStyle = g.strokeStyle;
+    const r = c.width / 80; g.beginPath(); g.moveTo(t.x - r, t.y); g.lineTo(t.x + r, t.y); g.moveTo(t.x, t.y - r); g.lineTo(t.x, t.y + r); g.stroke();
+    g.fillText(String(i+1), t.x + r, t.y - r); });
+  drawZoom(); renderTapList();
+}
+function drawZoom(){
+  const z = $('zoom'), g = z.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0,0,256,256);
+  const t = S.taps[S.cur]; if (!t || !S.img) return;
+  const half = 16; g.imageSmoothingEnabled = false;
+  g.drawImage(S.img, t.x - half, t.y - half, 2*half, 2*half, 0, 0, 256, 256);
+  g.strokeStyle = '#ff3b3b'; g.lineWidth = 1; g.beginPath(); g.moveTo(128,0); g.lineTo(128,256); g.moveTo(0,128); g.lineTo(256,128); g.stroke();
+}
+function renderTapList(){
+  $('tapList').innerHTML = PROMPTS.map((p, i) => `<span class="tap ${S.taps[i] ? 'done' : ''} ${i === S.cur ? 'cur' : ''}">${S.taps[i] ? '✓ ' : ''}${p}</span>`).join('');
+  $('tapHint').textContent = S.taps[S.cur] ? 'Fine-tune in the zoom square, then Confirm point.' : 'Tap on the picture: ' + PROMPTS[S.cur];
+  $('toRel').disabled = !(S.taps.every(t => t) && S.cur === 3 && S.confirmed);
+}
+function ptr(ev, el){ const r = el.getBoundingClientRect(); return { x: (ev.clientX - r.left) * el.width / r.width, y: (ev.clientY - r.top) * el.height / r.height }; }
+$('cal').addEventListener('pointerdown', ev => { S.taps[S.cur] = ptr(ev, $('cal')); S.confirmed = false; drawCal(); });
+$('zoom').addEventListener('pointerdown', ev => { const t = S.taps[S.cur]; if (!t) return; const p = ptr(ev, $('zoom'));
+  t.x += (p.x - 128) / 8; t.y += (p.y - 128) / 8; S.confirmed = false; drawCal(); });
+const nudge = (dx, dy) => () => { const t = S.taps[S.cur]; if (!t) return; t.x += dx; t.y += dy; drawCal(); };
+$('nxL').onclick = nudge(-.5, 0); $('nxR').onclick = nudge(.5, 0); $('nxU').onclick = nudge(0, -.5); $('nxD').onclick = nudge(0, .5);
+$('tapOk').onclick = () => { if (!S.taps[S.cur]) return;
+  if (S.cur < 3) { S.cur++; S.confirmed = false; } else { S.confirmed = true; } drawCal(); };
+$('tapBack').onclick = () => { if (S.cur > 0) { S.cur--; S.confirmed = false; drawCal(); } };
+$('toRel').onclick = () => { $('relSlider').max = S.n - 1; S.rel = S.rel ?? Math.floor(S.n / 3); setRelFrame(S.calFrame); show('s3'); };
+
+// ---- 3. release frame ----
+let relView = 0;
+function setRelFrame(n){ relView = Math.max(0, Math.min(S.n - 1, n)); $('relImg').src = frameUrl(relView); $('relSlider').value = relView;
+  $('relNum').textContent = relView; }
+$('relSlider').oninput = e => setRelFrame(parseInt(e.target.value));
+$('rm10').onclick = () => setRelFrame(relView - 10); $('rm1').onclick = () => setRelFrame(relView - 1);
+$('rp1').onclick = () => setRelFrame(relView + 1); $('rp10').onclick = () => setRelFrame(relView + 10);
+$('relMark').onclick = () => { S.relFrame = relView; $('relInfo').textContent = `Release frame set to ${relView}.`; $('toRun').disabled = false; };
+$('toRun').onclick = () => show('s4');
+$('skipRel').onclick = () => { S.relFrame = null; $('relInfo').textContent = 'No release frame: speed is taken at the first tracked frame and will read a little low.'; show('s4'); };
+
+// ---- 4/5. run and result ----
+$('btnRun').onclick = async () => {
+  const taps = {}; NAMES.forEach((k, i) => taps[k] = [S.taps[i].x, S.taps[i].y]);
+  const body = { taps, release_frame: S.relFrame, capture_fps: S.cfps,
+    reference_kmh: $('ref').value || null, camera_distance_m: $('dist').value || null,
+    lateral_offset_m: $('lat').value || null, notes: $('notes').value || null };
+  $('runMsg').textContent = 'Analysing… this can take up to a minute.'; $('btnRun').disabled = true;
+  await fetch(`/api/session/${S.sid}/analyze`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  pollResult();
+};
+async function pollResult(){
+  const s = await (await fetch(`/api/session/${S.sid}`)).json();
+  if (s.analysis !== 'done') { setTimeout(pollResult, 1000); return; }
+  $('btnRun').disabled = false; $('runMsg').textContent = '';
+  const r = s.result;
+  if (!r.ok) { $('runMsg').textContent = 'No result: ' + r.message + (r.warnings && r.warnings.length ? ' (' + r.warnings.join('; ') + ')' : ''); return; }
+  $('resBig').textContent = `${r.release_kmh.toFixed(1)} ± ${r.ci95_kmh.toFixed(1)} km/h`;
+  $('resBadge').innerHTML = `<span class="badge ${r.confidence}">${r.confidence} confidence</span>`;
+  const ref = parseFloat((s.meta || {}).reference_kmh);
+  $('resDiff').textContent = isNaN(ref) ? '' : `Reference ${ref.toFixed(1)} km/h → difference ${(r.release_kmh - ref >= 0 ? '+' : '') + (r.release_kmh - ref).toFixed(1)} km/h`;
+  $('resNotes').innerHTML = [...r.reasons, ...r.warnings].map(x => `<li>${x}</li>`).join('');
+  $('resDetail').textContent = `Average speed over tracked flight ${r.average_kmh.toFixed(1)} km/h · ${r.n_frames} frames tracked · fit residual ${r.rms_cm.toFixed(1)} cm · gravity check ${r.gravity_ratio.toFixed(2)} · ${r.fps.toFixed(0)} fps (${r.timing_source})`;
+  $('resImg').src = `/api/session/${S.sid}/overlay.jpg?ts=${Date.now()}`;
+  show('s5');
+}
+$('again').onclick = () => { $('file').value = ''; $('upBar').classList.add('hide'); $('upMsg').textContent = ''; show('s1'); };
+$('reRun').onclick = () => { S.cur = 3; S.confirmed = true; show('s2'); drawCal(); };
+$('navNew').onclick = () => show('s1');
+$('navHist').onclick = async () => {
+  const list = await (await fetch('/api/sessions')).json();
+  $('histTable').innerHTML = '<tr><th>when</th><th>est</th><th>ref</th><th>conf</th></tr>' + list.map(s => {
+    const r = s.result || {}, m = s.meta || {};
+    return `<tr><td>${s.created || ''}</td><td>${r.ok ? r.release_kmh.toFixed(1) + '±' + r.ci95_kmh.toFixed(1) : '–'}</td><td>${m.reference_kmh || ''}</td><td>${r.confidence || ''}</td></tr>`; }).join('');
+  show('sH');
+};
+</script>
+</body>
+</html>
